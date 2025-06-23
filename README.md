@@ -32,13 +32,13 @@ Creates a new directory and gets you started!
 
 ## Getting Inputs
 
-Make sure you've [Gotten your session cookie](#getting-your-session-cookie) first. Then, run `./fetch.py` with the day and user you want. For example, the fifth day would be for dad would be
+Make sure you've [Gotten your session cookie](#getting-your-session-cookie) first. Then, run `./fetch.py` with the day you want. For example, the fifth day would be:
 
 ``` zsh
-./fetch.py 5 ukr
+./fetch.py 5
 ```
 
-This places day 5's input in `inputs/ukr/day05.txt`.
+This places day 5's input in `inputs/day05.txt`.
 
 ### Getting your session cookie
 
