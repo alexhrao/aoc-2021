@@ -4,16 +4,27 @@
 from __future__ import annotations
 
 import subprocess
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser, Namespace, ArgumentDefaultsHelpFormatter
 from pathlib import Path
+import sys
 
 
-def parse_args() -> Namespace:
+class Args(Namespace):
+    """Parsed CLI Arguments."""
+
+    day: int | None
+    """Day to fetch"""
+    cookie: str | None
+    """Cookie to use"""
+
+
+def parse_args() -> Args:
     """Parse CLI Arguments."""
-    parser = ArgumentParser()
-    parser.add_argument("day", type=int, help="Day to fetch")
+    parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
+    day = max((int(d.name[3:]) for d in Path.cwd().glob("day*")), default=None)
+    parser.add_argument("day", type=int, help="Day to fetch", nargs="?", default=day)
     parser.add_argument("--cookie", help="Auth cookie. Otherwise, `auth.txt` is used")
-    return parser.parse_args()
+    return parser.parse_args(namespace=Args())
 
 
 def fetch(day: int, cookie: str | None = None) -> None:
@@ -36,10 +47,13 @@ def fetch(day: int, cookie: str | None = None) -> None:
             tgt.joinpath(f"day{day:02d}.txt").resolve(),
             "-s",
         ],
-        check=False,
+        check=True,
     )
 
 
 if __name__ == "__main__":
     args = parse_args()
+    if args.day is None:
+        print("Day is required", file=sys.stderr)
+        sys.exit(1)
     fetch(args.day, args.cookie)

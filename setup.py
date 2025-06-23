@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import json
+import os
+import stat
 import subprocess
 import sys
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 from getpass import getuser
 from pathlib import Path
 from typing import Callable, Literal
@@ -17,41 +19,66 @@ type Language = Literal["rs", "py", "go", "js", "ts"]
 SUFFIXES: list[Language] = ["go", "js", "py", "rs", "ts"]
 """All the allowed suffixes"""
 
-LANGS: dict[str, Language] = {
-    "rust": "rs",
-    "python": "py",
-    "go": "go",
-    "javascript": "js",
-    "typescript": "ts",
+LANG_SUFFIXES: dict[str, Language] = {
+    "Rust": "rs",
+    "Python": "py",
+    "Go": "go",
+    "JavaScript": "js",
+    "TypeScript": "ts",
 }
 """Programming language names mapped to their standardized suffix."""
 
+SUFFIX_LANGS: dict[Language, str] = {
+    "rs": "Rust",
+    "py": "Python",
+    "go": "Go",
+    "js": "JavaScript",
+    "ts": "TypeScript",
+}
+"""Language file suffixes mapped to their standard name"""
 
-def parse_args() -> Namespace:
+
+class Args(Namespace):
+    """Parsed CLI Arguments."""
+
+    day: int
+    """Day to set up."""
+    lang: Language
+    """Language to use."""
+    user: Literal["ahr", "ukr"]
+    """User who is making the attempt."""
+
+
+def parse_args() -> Args:
     """Parse CLI Arguments."""
-    parser = ArgumentParser()
-    langs = set(LANGS.keys()).union(LANGS.values())
+    parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument("day", type=int, help="Day you want to setup, starting with 1")
-    parser.add_argument("lang", choices=langs, help="Language you want to use")
+    parser.add_argument(
+        "lang",
+        type=str.lower,
+        choices=SUFFIXES,
+        help="Language you want to use",
+    )
     parser.add_argument(
         "user",
         choices=["ahr", "ukr"],
         help="Who are you",
         default="ahr" if getuser().startswith("al") else "ukr",
     )
-    return parser.parse_args()
+
+    return parser.parse_args(namespace=Args())
 
 
 def setup_py(d: Path, day: int) -> None:
     """Set up the directory as a Python3 script."""
-    subprocess.run(["python3", "-m", "venv", ".venv"], check=False, cwd=d)
+    subprocess.run(["python3", "-m", "venv", ".venv"], check=True, cwd=d)
     with d.joinpath("main.py").open("w", encoding="utf8") as fid:
         fid.writelines(
             [
                 "#!/usr/bin/env python3\n",
-                f'"""Python implementation for day {day:02d}\n',
+                f'"""Python implementation for day {day:02d}."""\n',
                 "\n",
-                "def part1():\n",
+                "from sys import argv\n\ndef part1():\n",
                 "    pass\n",
                 "\n",
                 "\n",
@@ -59,40 +86,63 @@ def setup_py(d: Path, day: int) -> None:
                 "    pass\n",
                 "\n",
                 'if __name__ == "__main__":\n',
-                "    print('Part 1')\n    part1()\n    print('Part 2')\n    part2()\n",
+                '    if len(argv) < 2 or argv[1] == "1":\n'
+                "        print('Part 1')\n    part1()\n",
+                '    if len(argv) < 2 or argv[1] == "2":\n'
+                "        print('Part 2')\n    part2()\n",
             ],
         )
+        st = os.fstat(fid.fileno())
+        os.fchmod(fid.fileno(), st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
     with d.joinpath(".gitignore").open("w", encoding="utf8") as fid:
         fid.write("/.venv\n*.pyc\n__pycache__\n")
 
 
 def setup_go(d: Path, day: int) -> None:
     """Set up the directory as a go module."""
-    subprocess.run(["go", "mod", "init", f"day{day:02d}"], check=False, cwd=d)
+    subprocess.run(
+        ["go", "mod", "init", f"day{day:02d}"],
+        check=True,
+        cwd=d,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
     with d.joinpath("main.go").open("w", encoding="utf8") as fid:
         fid.writelines(
             [
                 "package main\n",
                 "\n",
-                'import "fmt"\n\n',
+                "import (\n",
+                '\t"fmt"\n',
+                '\t"os"\n',
+                ")\n",
+                "\n",
                 "func part1() {}\n",
                 "\n",
                 "func part2() {}\n",
                 "\n",
                 "func main() {\n",
-                '    fmt.Println("Part 1")\n',
-                '    part1()\n    fmt.Println("Part 2")\n',
-                "    part2()\n",
+                '\tif len(os.Args) < 2 || os.Args[1] == "1" {\n',
+                '\t\tfmt.Println("Part 1")\n',
+                "\t\tpart1()\n",
+                "\t}\n",
+                '\tif len(os.Args) < 2 || os.Args[1] == "2" {\n',
+                '\t\tfmt.Println("Part 2")\n',
+                "\t\tpart2()\n",
+                "\t}\n",
                 "}\n",
             ],
         )
+    with d.joinpath(".gitignore").open("w", encoding="utf8") as fid:
+        fid.write(f"/day{day:02d}\n")
 
 
-def setup_js(d: Path, day: int) -> None:
+def setup_js(d: Path, day: int, ext: str | None = "js") -> None:
     """Set up the directory as a node.js script."""
     subprocess.run(
-        ["npm", "init", "-y", "--silent"],
-        check=False,
+        ["npm", "init", "-y"],
+        check=True,
         cwd=d,
         stdout=subprocess.DEVNULL,
     )
@@ -102,16 +152,29 @@ def setup_js(d: Path, day: int) -> None:
     pkg["scripts"]["start"] = "node index.js"
     with d.joinpath("package.json").open("w", encoding="utf8") as fid:
         json.dump(pkg, fid, indent=4)
-    with d.joinpath("index.js").open("w", encoding="utf8") as fid:
+    # Add node typings so VSC knows this is a node project
+    subprocess.run(
+        ["npm", "install", "--save-dev", "@types/node"],
+        check=True,
+        cwd=d,
+        stdout=subprocess.DEVNULL,
+    )
+    with d.joinpath(f"index.{ext}").open("w", encoding="utf8") as fid:
         fid.writelines(
             [
                 "function part1() {}\n",
                 "\n",
                 "function part2() {}\n",
                 "\n",
-                "console.log('Part 1');\n",
-                "part1();\nconsole.log('Part 2');\n",
-                "part2();\n",
+                'if (process.argv.length < 2 || process.argv[1] === "1") {\n',
+                '    console.log("Part 1");\n',
+                "    part1();\n",
+                "}\n",
+                "\n",
+                'if (process.argv.length < 2 || process.argv[1] === "2") {\n',
+                '    console.log("Part 2");\n',
+                "    part2();\n",
+                "}\n",
             ],
         )
     with d.joinpath(".gitignore").open("w", encoding="utf8") as fid:
@@ -120,42 +183,26 @@ def setup_js(d: Path, day: int) -> None:
 
 def setup_ts(d: Path, day: int) -> None:
     """Set up the directory as a Typescript (to node.js) script."""
-    subprocess.run(
-        ["npm", "init", "-y"],
-        check=False,
-        cwd=d,
-        stdout=subprocess.DEVNULL,
-    )
+    # Start as if just vanilla JS
+    setup_js(d, day, "ts")
+    # Fix up the start script to use TSC
     with d.joinpath("package.json").open("r", encoding="utf8") as fid:
         pkg = json.load(fid)
-    pkg["name"] = f"day{day:02d}"
     pkg["scripts"]["start"] = "npx tsc && node index.js"
     with d.joinpath("package.json").open("w", encoding="utf8") as fid:
         json.dump(pkg, fid, indent=4)
     subprocess.run(
         ["npm", "install", "--save-dev", "typescript"],
-        check=False,
+        check=True,
         cwd=d,
         stdout=subprocess.DEVNULL,
     )
     subprocess.run(
         ["npx", "tsc", "--init"],
-        check=False,
+        check=True,
         cwd=d,
         stdout=subprocess.DEVNULL,
     )
-    with d.joinpath("index.ts").open("w", encoding="utf8") as fid:
-        fid.writelines(
-            [
-                "function part1() {}\n",
-                "\n",
-                "function part2() {}\n",
-                "\n",
-                "console.log('Part 1');\n",
-                "part1();\nconsole.log('Part 2');\n",
-                "part2();\n",
-            ],
-        )
     with d.joinpath(".gitignore").open("w", encoding="utf8") as fid:
         fid.write("/index.js\n/node_modules\n")
 
@@ -164,9 +211,12 @@ def setup_rs(d: Path, day: int) -> None:
     """Set up the directory as a Rust Crate."""
     subprocess.run(
         ["cargo", "init", "--name", f"day{day:02d}", "--bin", "--vcs", "none"],
-        check=False,
+        check=True,
         cwd=d,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
+
     with d.joinpath(".gitignore").open("w", encoding="utf8") as fid:
         fid.write("/target\n")
     with d.joinpath("src", "main.rs").open("w", encoding="utf8") as fid:
@@ -177,10 +227,19 @@ def setup_rs(d: Path, day: int) -> None:
                 "fn part2() {}\n",
                 "\n",
                 "fn main() {\n",
-                '    println!("Part 1");\n',
-                "    part1();\n",
-                '    println!("Part 2");\n',
-                "    part2();\n",
+                "let (p1, p2) = if let Some(which) = std::env::args().nth(1) {\n"
+                '        (which == "1", which == "2")\n'
+                "    } else {\n"
+                "        (true, true)\n"
+                "    };\n"
+                "    if p1 {\n"
+                '        println!("Part 1");\n'
+                "        part1();\n"
+                "    }\n"
+                "    if p2 {\n"
+                '        println!("Part 2");\n'
+                "        part2();\n"
+                "    }\n"
                 "}\n",
             ],
         )
@@ -199,14 +258,10 @@ language"""
 
 if __name__ == "__main__":
     args = parse_args()
-    lang: Language | None = LANGS.get(args.lang, args.lang)
-    if args.lang not in SUFFIXES:
-        print(f"Unknown language {lang}", file=sys.stderr)
-        sys.exit(1)
-    p = Path(f"day{args.day:02d}", args.lang, args.user)
+    p = Path(f"day{args.day:02d}", f"{args.lang}-{args.user}-day{args.day:02d}")
     if p.is_dir():
         print("You've already started on that!", file=sys.stderr)
         sys.exit(1)
     p.mkdir(parents=True, exist_ok=True)
     SETUPS[args.lang](p, args.day)
-    subprocess.run(["code", p.resolve()], check=False)
+    subprocess.run(["code", p.resolve()], check=True)

@@ -28,7 +28,7 @@ Suppose we're starting day 2 and this time want to use Rust
 ./setup.py 2 rust ahr
 ```
 
-Creates a new directory and gets you started!
+Creates a new directory in `day02` and gets you started!
 
 ## Getting Inputs
 
@@ -40,7 +40,15 @@ Make sure you've [Gotten your session cookie](#getting-your-session-cookie) firs
 
 This places day 5's input in `inputs/day05.txt`.
 
-### Getting your session cookie
+## Picking a winner
+
+To run all the entries for a given day, use `run.py`. To run the latest day, do `run.py DAY`; otherwise, it picks the latest day for which there is an attempt.
+
+``` zsh
+./run.py 5 # Runs the fifth day
+```
+
+## Getting your session cookie
 
 After you've logged in, open the Developer tools and navigate to the Storage tab:
 
